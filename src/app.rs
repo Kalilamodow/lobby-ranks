@@ -16,18 +16,20 @@ pub struct RankDisplayApp {
 }
 
 impl RankDisplayApp {
-    pub fn new() -> Self {
+    pub fn new(ctx: &eframe::CreationContext) -> Self {
         let (player_tx, player_rx) = mpsc::channel();
         let app = RankDisplayApp {
             players: None,
             players_receiver: player_rx,
-            player_ranks: PlayerRankInformation::new(),
+            player_ranks: PlayerRankInformation::new(ctx.egui_ctx.clone()),
             current_error: None,
         };
 
+        let ctx = ctx.egui_ctx.clone();
         thread::spawn(move || {
             let result = rl_stats_api::connect_to_stats_api(|player_datas| {
                 player_tx.send(Ok(player_datas)).unwrap();
+                ctx.request_repaint();
             });
 
             if let Err(error) = result {

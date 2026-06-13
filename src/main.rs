@@ -15,6 +15,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "lobby ranks",
         gui_options,
-        Box::new(|_cx| Ok(Box::new(app::RankDisplayApp::new()))),
+        Box::new(|cc| Ok(Box::new(app::RankDisplayApp::new(cc)))),
     )
 }

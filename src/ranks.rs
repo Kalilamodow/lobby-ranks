@@ -4,6 +4,7 @@ use std::{
     thread,
 };
 
+use eframe::egui;
 use serde::Deserialize;
 
 use crate::rl_stats_api::{Platform, PlayerData};
@@ -51,6 +52,7 @@ pub struct PlayerRankInformation {
     // key is stringified PlayerData
     // option for whether its loaded yet
     ranks: Arc<RwLock<HashMap<String, Option<Arc<EventRanks>>>>>,
+    context: egui::Context,
 }
 
 fn playlist_segment_tier_by_playlist(
@@ -68,9 +70,10 @@ fn playlist_segment_tier_by_playlist(
 }
 
 impl PlayerRankInformation {
-    pub fn new() -> PlayerRankInformation {
+    pub fn new(context: egui::Context) -> PlayerRankInformation {
         PlayerRankInformation {
             ranks: Arc::new(RwLock::new(HashMap::new())),
+            context,
         }
     }
 
@@ -98,6 +101,7 @@ impl PlayerRankInformation {
             }
         };
 
+        let context = self.context.clone();
         thread::spawn(move || {
             let mut current = current.write().unwrap();
             current.insert(player_key.clone(), None);
@@ -122,6 +126,7 @@ impl PlayerRankInformation {
             };
 
             current.insert(player_key.clone(), Some(Arc::new(ranks)));
+            context.request_repaint();
         });
 
         None
