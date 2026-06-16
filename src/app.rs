@@ -103,7 +103,8 @@ impl RankDisplayApp {
                                 if let Some(rank) = rank {
                                     ui.image(rank.to_image()).on_hover_text(rank.as_str());
                                 } else {
-                                    ui.label("Error");
+                                    ui.image(Rank::Unranked.to_image())
+                                        .on_hover_text("No data for gamemode");
                                 }
                             }
                         } else {
