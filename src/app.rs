@@ -107,15 +107,15 @@ impl RankDisplayApp {
                                 }
                             }
                         } else {
-                            ui.label("Loading...");
-                            ui.label("Loading...");
-                            ui.label("Loading...");
+                            ui.spinner();
+                            ui.spinner();
+                            ui.spinner();
                         }
                         ui.end_row();
                     }
                 });
         } else {
-            ui.label("waiting for game...");
+            ui.label("Waiting for game...");
             ui.spinner();
         }
     }
@@ -131,7 +131,7 @@ impl eframe::App for RankDisplayApp {
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.heading("player ranks");
+            ui.heading("Lobby info");
             ui.add_space(8.0);
             if let Some(err) = &self.current_error {
                 ui.label(bold_text("Fatal error"));

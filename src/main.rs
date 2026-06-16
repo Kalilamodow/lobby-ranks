@@ -13,7 +13,7 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        "lobby ranks",
+        "Lobby info",
         gui_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
