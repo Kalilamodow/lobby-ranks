@@ -34,7 +34,7 @@ impl Rank {
             Rank::GC1 => egui::include_image!("../assets/Grand_Champion1_rank_icon.png"),
             Rank::GC2 => egui::include_image!("../assets/Grand_Champion2_rank_icon.png"),
             Rank::GC3 => egui::include_image!("../assets/Grand_Champion3_rank_icon.png"),
-            Rank::SSL => egui::include_image!("../assets/Supersonic_Legend_rank_icon.png"),
+            Rank::Ssl => egui::include_image!("../assets/Supersonic_Legend_rank_icon.png"),
         }
     }
 }
@@ -109,7 +109,7 @@ impl RankDisplayApp {
             return;
         };
 
-        if players.len() <= 0 {
+        if players.is_empty() {
             ui.label("No players");
             return;
         }
@@ -135,7 +135,7 @@ impl RankDisplayApp {
                         ui.label("-");
                         ui.label("-");
                         ui.label("-");
-                    } else if let Some(player_skills) = self.player_ranks.get(&player) {
+                    } else if let Some(player_skills) = self.player_ranks.get(player) {
                         let modes = [
                             &player_skills.ranked_1s,
                             &player_skills.ranked_2s,
@@ -149,10 +149,11 @@ impl RankDisplayApp {
                                         "{}\nMMR: {}{}",
                                         skill.rank.as_str(),
                                         skill.mmr,
-                                        skill
-                                            .rank_is_estimate
-                                            .then(|| "\nRank estimate based on MMR")
-                                            .unwrap_or_default()
+                                        if skill.rank_is_estimate {
+                                            "\nRank estimate based on MMR"
+                                        } else {
+                                            ""
+                                        }
                                     ));
 
                                 if skill.rank_is_estimate {

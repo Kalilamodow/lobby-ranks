@@ -88,7 +88,7 @@ fn parse_stats_api_player(value: StatsApiPlayerData) -> Option<PlayerData> {
     if let Ok(platform) = Platform::from_str(parts[0]) {
         Some(PlayerData {
             name: value.name,
-            platform: platform,
+            platform,
             platform_id: value.id_data,
         })
     } else {
@@ -132,7 +132,7 @@ pub enum RLEvent {
 // socket isnt open in the first place
 fn connect_forever() -> TcpStream {
     loop {
-        match TcpStream::connect(&"127.0.0.1:49123".parse::<SocketAddr>().unwrap()) {
+        match TcpStream::connect("127.0.0.1:49123".parse::<SocketAddr>().unwrap()) {
             Ok(tcp) => return tcp,
             Err(_) => continue,
         }
@@ -165,7 +165,7 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
             }
         };
 
-        let Ok(event) = serde_json::from_str::<StatsApiEvent>(&text) else {
+        let Ok(event) = serde_json::from_str::<StatsApiEvent>(text) else {
             // ignore (probably framing issue)
             continue;
         };
@@ -177,19 +177,16 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
                 on_event(RLEvent::SetPlayerList(
                     data.players
                         .into_iter()
-                        .map(parse_stats_api_player)
-                        .filter_map(std::convert::identity)
+                        .filter_map(parse_stats_api_player)
                         .collect(),
                 ));
             }
             "MatchCreated" => {
                 match_created_event_happened = true;
             }
-            "CountdownBegin" => {
-                if match_created_event_happened {
-                    match_created_event_happened = false;
-                    on_event(RLEvent::MatchStart);
-                }
+            "CountdownBegin" if match_created_event_happened => {
+                match_created_event_happened = false;
+                on_event(RLEvent::MatchStart);
             }
             _ => {}
         }

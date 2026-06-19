@@ -4,7 +4,6 @@ use std::{
     path::Path,
     thread,
 };
-use ureq;
 
 const URLS: [&str; 24] = [
     "https://static.wikia.nocookie.net/rocketleague/images/0/00/Unranked_icon.png",

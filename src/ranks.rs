@@ -77,7 +77,7 @@ pub enum Rank {
     GC1,
     GC2,
     GC3,
-    SSL,
+    Ssl,
 }
 
 impl Rank {
@@ -105,7 +105,7 @@ impl Rank {
             Rank::GC1 => "Grand Champion I",
             Rank::GC2 => "Grand Champion II",
             Rank::GC3 => "Grand Champion III",
-            Rank::SSL => "Supersonic Legend",
+            Rank::Ssl => "Supersonic Legend",
         }
     }
 }
@@ -166,12 +166,12 @@ fn mmr_rank_estimate(mmr: &i16) -> Rank {
         ..=1232 => Rank::GC1,
         ..=1295 => Rank::GC2,
         ..=1351 => Rank::GC3,
-        _ => Rank::SSL,
+        _ => Rank::Ssl,
     }
 }
 
 fn skill_by_playlist(
-    skills: &Vec<GetPlayerSkillsResponseSkill>,
+    skills: &[GetPlayerSkillsResponseSkill],
     playlist: Playlist,
 ) -> Option<PlayerSkillInformation> {
     let playlist_id = playlist as u8;
