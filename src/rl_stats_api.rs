@@ -102,7 +102,7 @@ pub struct PlayerData {
 
 fn parse_stats_api_player(data: (usize, StatsApiPlayerData)) -> Option<PlayerData> {
     let (index, value) = data;
-    let parts: Vec<&str> = value.primary_id.split("|").collect();
+    let parts: Vec<&str> = value.primary_id.split('|').collect();
 
     if let Ok(platform) = Platform::from_str(parts[0]) {
         Some(PlayerData {
@@ -153,9 +153,8 @@ pub enum RLEvent {
 // socket isnt open in the first place
 fn connect_forever() -> TcpStream {
     loop {
-        match TcpStream::connect("127.0.0.1:49123".parse::<SocketAddr>().unwrap()) {
-            Ok(tcp) => return tcp,
-            Err(_) => continue,
+        if let Ok(tcp) = TcpStream::connect("127.0.0.1:49123".parse::<SocketAddr>().unwrap()) {
+            return tcp;
         }
     }
 }
@@ -177,13 +176,10 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
             Err(_) => return Err(StatsApiError::CouldNotConnect),
         };
 
-        let text = match std::str::from_utf8(&read_buffer[..n_bytes]) {
-            Ok(t) => t,
-            Err(_) => {
-                return Err(StatsApiError::InvalidStatsApiMessage(String::from(
-                    "cant decode",
-                )));
-            }
+        let Ok(text) = std::str::from_utf8(&read_buffer[..n_bytes]) else {
+            return Err(StatsApiError::InvalidStatsApiMessage(String::from(
+                "cant decode",
+            )));
         };
 
         let Ok(event) = serde_json::from_str::<StatsApiEvent>(text) else {

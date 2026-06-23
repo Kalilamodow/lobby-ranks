@@ -49,7 +49,7 @@ pub struct RankDisplayApp {
     prev_hide_pos: Option<egui::Pos2>,
 }
 
-fn schedule_overlay_flyover(ctx: egui::Context, overlay_tx: mpsc::Sender<bool>) {
+fn schedule_overlay_flyover(ctx: &egui::Context, overlay_tx: mpsc::Sender<bool>) {
     let is_focused_already = ctx.input(|i| i.viewport().focused.unwrap_or(false));
     if is_focused_already {
         return;
@@ -94,8 +94,7 @@ impl RankDisplayApp {
                         let our_team = new_players
                             .iter()
                             .find(|p| p.is_self)
-                            .map(|p| p.team)
-                            .unwrap_or(Team::Blue);
+                            .map_or(Team::Blue, |p| p.team);
                         // != bc false comes first
                         new_players.sort_by_key(|p| p.team != our_team);
 
@@ -104,7 +103,7 @@ impl RankDisplayApp {
                     }
                 }
                 RLEvent::MatchStart => {
-                    schedule_overlay_flyover(ctx.clone(), overlay_tx_for_popup.clone())
+                    schedule_overlay_flyover(&ctx, overlay_tx_for_popup.clone());
                 }
             });
 
@@ -173,21 +172,14 @@ impl RankDisplayApp {
                         ui.label("-");
                     } else if let Some(player_skills) = self.player_ranks.get(&player.platform_id) {
                         let modes = [
-                            &player_skills.ranked_1s,
-                            &player_skills.ranked_2s,
-                            &player_skills.ranked_3s,
+                            &player_skills.duels,
+                            &player_skills.doubles,
+                            &player_skills.standard,
                         ];
 
                         for mode in modes {
                             if let Some(mode) = mode {
-                                if !mode.rank_is_estimate {
-                                    ui.image(mode.rank.to_image()).on_hover_text(format!(
-                                        "{}{}\nMMR: {}",
-                                        mode.rank.as_str(),
-                                        mode.div,
-                                        mode.mmr
-                                    ));
-                                } else {
+                                if mode.rank_is_estimate {
                                     let response = ui.image(mode.rank.to_image()).on_hover_text(
                                         format!("MMR: {}\nRank estimated", mode.mmr),
                                     );
@@ -210,6 +202,13 @@ impl RankDisplayApp {
                                         egui::FontId::proportional(8.0),
                                         egui::Color32::WHITE,
                                     );
+                                } else {
+                                    ui.image(mode.rank.to_image()).on_hover_text(format!(
+                                        "{}{}\nMMR: {}",
+                                        mode.rank.as_str(),
+                                        mode.div,
+                                        mode.mmr
+                                    ));
                                 }
                             } else {
                                 ui.image(Rank::Unranked.to_image())

@@ -33,7 +33,7 @@ const URLS: [&str; 24] = [
 ];
 
 fn download(url: &str, out_dir: &Path) {
-    let path = out_dir.join(url.split("/").last().unwrap());
+    let path = out_dir.join(url.split('/').next_back().unwrap());
     if path.exists() {
         return;
     }
@@ -41,7 +41,7 @@ fn download(url: &str, out_dir: &Path) {
     let response = match ureq::get(url).call() {
         Ok(r) => r,
         Err(e) => {
-            println!("cargo::warning=failed to fetch asset {}: {}", url, e);
+            println!("cargo::warning=failed to fetch asset {url}: {e}");
             return;
         }
     };

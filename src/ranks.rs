@@ -99,6 +99,7 @@ impl Rank {
 
     // uses f2p season 23 1v1
     pub fn estimate_from_mmr(mmr: i16) -> Rank {
+        #[allow(clippy::match_overlapping_arm)]
         match mmr {
             ..=156 => Rank::Bronze1,
             ..=213 => Rank::Bronze2,
@@ -181,21 +182,21 @@ impl PlayerSkillInformation {
 
 #[derive(Debug)]
 pub struct EventRanks {
-    pub ranked_1s: Option<PlayerSkillInformation>,
-    pub ranked_2s: Option<PlayerSkillInformation>,
-    pub ranked_3s: Option<PlayerSkillInformation>,
+    pub duels: Option<PlayerSkillInformation>,
+    pub doubles: Option<PlayerSkillInformation>,
+    pub standard: Option<PlayerSkillInformation>,
 }
 
 impl EventRanks {
-    fn from_skills(skill: GetPlayerSkillsResponse) -> EventRanks {
+    fn from_skills(skill: &GetPlayerSkillsResponse) -> EventRanks {
         EventRanks {
-            ranked_1s: skill
+            duels: skill
                 .get_playlist(Playlist::Ones)
                 .map(PlayerSkillInformation::from_playlist),
-            ranked_2s: skill
+            doubles: skill
                 .get_playlist(Playlist::Twos)
                 .map(PlayerSkillInformation::from_playlist),
-            ranked_3s: skill
+            standard: skill
                 .get_playlist(Playlist::Threes)
                 .map(PlayerSkillInformation::from_playlist),
         }
@@ -206,9 +207,8 @@ fn get_with_retries<const RETRIES: u8>(
     url: &String,
 ) -> Result<ureq::http::Response<ureq::Body>, ()> {
     for _ in 0..RETRIES {
-        match ureq::get(url).call() {
-            Ok(resp) => return Ok(resp),
-            Err(_) => continue,
+        if let Ok(resp) = ureq::get(url).call() {
+            return Ok(resp);
         }
     }
 
@@ -264,7 +264,7 @@ impl RankAPI {
                 .read_json::<GetPlayerSkillsResponse>()
                 .unwrap();
 
-            let ranks = EventRanks::from_skills(response);
+            let ranks = EventRanks::from_skills(&response);
 
             let mut current = current.write().unwrap();
             current.insert(platform_id, Some(Arc::new(ranks)));
