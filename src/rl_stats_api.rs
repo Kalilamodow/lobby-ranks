@@ -26,9 +26,16 @@ struct StatsApiPlayerData {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 struct UpdateStateEventData {
-    #[serde(rename = "Players")]
     players: Vec<StatsApiPlayerData>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct MatchEndedEventData {
+    winner_team_num: u8,
+    // match_guid: String,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -93,6 +100,20 @@ impl From<u8> for Team {
     }
 }
 
+impl fmt::Display for Team {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Team::Blue => "Blue",
+                Team::Orange => "Orange",
+            }
+        )
+    }
+}
+
+#[derive(Clone)]
 pub struct PlayerData {
     pub name: String,
     pub platform: Platform,
@@ -150,6 +171,7 @@ impl fmt::Display for StatsApiError {
 pub enum RLEvent {
     SetPlayerList(Vec<PlayerData>),
     MatchStart,
+    MatchEnd(Team),
 }
 
 // cant use connect_timeout bc it just errors instead of waiting when the
@@ -208,6 +230,11 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
             "CountdownBegin" if match_created_event_happened => {
                 match_created_event_happened = false;
                 on_event(RLEvent::MatchStart);
+            }
+            "MatchEnded" => {
+                let data: MatchEndedEventData = serde_json::from_str(&event.data)
+                    .map_err(|e| StatsApiError::InvalidStatsApiMessage(e.to_string() + text))?;
+                on_event(RLEvent::MatchEnd(Team::from(data.winner_team_num)));
             }
             _ => {}
         }

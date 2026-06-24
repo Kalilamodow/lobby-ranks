@@ -4,10 +4,20 @@ use crate::rl_stats_api::{self, Platform, PlayerData, RLEvent, Team};
 use eframe::egui::{self, Color32};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-fn bold_text(text: &str) -> egui::RichText {
+fn systemtime_since_epoch(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH).unwrap().as_secs()
+}
+
+fn bold_text(text: impl Into<String>) -> egui::RichText {
     egui::RichText::new(text).strong()
+}
+
+struct MatchInfo {
+    pub players: Vec<PlayerData>,
+    pub timestamp: SystemTime,
+    pub winner: Team,
 }
 
 impl Rank {
@@ -61,6 +71,7 @@ pub struct RankDisplayApp {
     current_error: Option<String>,
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
+    prev_match_info: Arc<Mutex<Vec<MatchInfo>>>,
 }
 
 fn schedule_overlay_flyover(ctx: &egui::Context, overlay_tx: mpsc::Sender<bool>) {
@@ -82,7 +93,8 @@ impl RankDisplayApp {
         let (errors_tx, errors_rx) = mpsc::channel();
         let (overlay_tx, overlay_rx) = mpsc::channel();
 
-        let players = Arc::new(Mutex::new(None));
+        let players = Arc::<Mutex<Option<Vec<PlayerData>>>>::default();
+        let prev_match_info = Arc::<Mutex<Vec<MatchInfo>>>::default();
 
         let app = RankDisplayApp {
             players: Arc::clone(&players),
@@ -91,6 +103,7 @@ impl RankDisplayApp {
             current_error: None,
             overlay_rx,
             prev_hide_pos: None,
+            prev_match_info: Arc::clone(&prev_match_info),
         };
 
         let overlay_tx_for_hotkey = overlay_tx.clone();
@@ -119,6 +132,19 @@ impl RankDisplayApp {
                 RLEvent::MatchStart => {
                     schedule_overlay_flyover(&ctx, overlay_tx_for_popup.clone());
                 }
+                RLEvent::MatchEnd(team) => {
+                    if let Some(players) = players.lock().unwrap().as_ref() {
+                        let mut prev_match_info = prev_match_info.lock().unwrap();
+                        prev_match_info.insert(
+                            0,
+                            MatchInfo {
+                                players: players.clone(),
+                                timestamp: SystemTime::now(),
+                                winner: team,
+                            },
+                        );
+                    }
+                }
             });
 
             if let Err(error) = result {
@@ -129,7 +155,7 @@ impl RankDisplayApp {
         app
     }
 
-    fn render_main_content(&mut self, ui: &mut egui::Ui) {
+    fn render_main_content(&self, ui: &mut egui::Ui) {
         let Ok(lock) = self.players.lock() else {
             return;
         };
@@ -145,16 +171,53 @@ impl RankDisplayApp {
             return;
         }
 
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.label("Current match");
+            self.render_players(ui, players, "current", true);
+
+            let prev_match_info = self.prev_match_info.lock().unwrap();
+            let current_time = SystemTime::now();
+            for prev_match in prev_match_info.iter() {
+                ui.separator();
+
+                ui.horizontal(|ui| {
+                    ui.label(bold_text(format!("{}", prev_match.winner)));
+                    ui.label(format!(
+                        "{} seconds ago",
+                        current_time
+                            .duration_since(prev_match.timestamp)
+                            .unwrap_or_default()
+                            .as_secs()
+                    ));
+                });
+
+                self.render_players(
+                    ui,
+                    &prev_match.players,
+                    systemtime_since_epoch(prev_match.timestamp)
+                        .to_string()
+                        .as_str(),
+                    false,
+                );
+            }
+        });
+    }
+
+    fn render_players(&self, ui: &mut egui::Ui, players: &Vec<PlayerData>, id: &str, main: bool) {
         // 3 columns + allocate_space hack
         // https://github.com/emilk/egui/issues/3928
-        ui.label("Current match");
-        egui::Grid::new("current match details")
+        egui::Grid::new(id)
             .spacing(egui::vec2(16.0, 8.0))
             .striped(true)
             .num_columns(3)
             .show(ui, |ui| {
-                ui.label(bold_text("Player"));
-                ui.label(bold_text("Score"));
+                if main {
+                    ui.label(bold_text("Player"));
+                    ui.label(bold_text("Score"));
+                } else {
+                    ui.label("Player");
+                    ui.label("Score");
+                }
                 ui.allocate_space(egui::vec2(ui.available_width(), 0.0));
                 ui.end_row();
 
