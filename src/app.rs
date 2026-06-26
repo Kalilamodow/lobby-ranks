@@ -193,7 +193,7 @@ impl RankDisplayApp {
         // 3 columns + allocate_space hack
         // https://github.com/emilk/egui/issues/3928
         egui::Grid::new(id)
-            .spacing(egui::vec2(16.0, 12.0))
+            .spacing(egui::vec2(8.0, 12.0))
             .striped(true)
             .num_columns(3)
             .show(ui, |ui| {
@@ -248,18 +248,21 @@ impl RankDisplayApp {
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 4.0;
 
-                        ui.label(
-                            bold_text(&player.name)
-                                .color(match player.team {
-                                    Team::Blue => Color32::from_rgb(64, 128, 255),
-                                    Team::Orange => Color32::ORANGE,
-                                })
-                                .size(15.0),
+                        ui.add(
+                            egui::Label::new(
+                                bold_text(&player.name)
+                                    .color(match player.team {
+                                        Team::Blue => Color32::from_rgb(64, 128, 255),
+                                        Team::Orange => Color32::ORANGE,
+                                    })
+                                    .size(15.0),
+                            )
+                            .extend(),
                         );
 
-                        // rank list
-                        ui.horizontal(|ui| {
-                            if let Some(skill) = &skill {
+                        if let Some(skill) = &skill {
+                            // rank list
+                            ui.horizontal(|ui| {
                                 let modes = [&skill.duels, &skill.doubles, &skill.standard];
 
                                 for mode in modes {
@@ -283,12 +286,16 @@ impl RankDisplayApp {
                                                     .color(mode.rank.to_color()),
                                             );
                                         } else {
-                                            ui.label("None");
+                                            ui.image(Rank::Unranked.to_image());
+                                            ui.label(
+                                                egui::RichText::new("---")
+                                                    .color(Rank::Unranked.to_color()),
+                                            );
                                         }
                                     });
                                 }
-                            }
-                        });
+                            });
+                        }
                     });
 
                     center_label(ui, player.score.to_string());
