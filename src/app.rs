@@ -64,6 +64,32 @@ impl Rank {
     }
 }
 
+enum Playlist {
+    Ones,
+    Twos,
+    Threes,
+    Other,
+}
+
+fn center_layout<R>(
+    ui: &mut egui::Ui,
+    height: f32,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), height),
+        egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+        add_contents,
+    )
+}
+
+fn center_label(
+    ui: &mut egui::Ui,
+    text: impl Into<egui::WidgetText>,
+) -> egui::InnerResponse<egui::Response> {
+    center_layout(ui, 16.0, |ui| ui.label(text))
+}
+
 pub struct RankDisplayApp {
     error_receiver: mpsc::Receiver<String>,
     current_error: Option<String>,
@@ -157,20 +183,31 @@ impl RankDisplayApp {
     }
 
     fn render_players(&self, ui: &mut egui::Ui, players: &Vec<PlayerData>, id: &str, main: bool) {
+        let playlist = match players.len() {
+            2 => Playlist::Ones,
+            4 => Playlist::Twos,
+            6 => Playlist::Threes,
+            _ => Playlist::Other,
+        };
+
         // 3 columns + allocate_space hack
         // https://github.com/emilk/egui/issues/3928
         egui::Grid::new(id)
-            .spacing(egui::vec2(16.0, 8.0))
+            .spacing(egui::vec2(16.0, 12.0))
             .striped(true)
             .num_columns(3)
             .show(ui, |ui| {
-                if main {
-                    ui.label(bold_text("Player"));
-                    ui.label(bold_text("Score"));
-                } else {
-                    ui.label("Player");
-                    ui.label("Score");
-                }
+                let bold_if_main = |text: &str| {
+                    if main {
+                        bold_text(text)
+                    } else {
+                        egui::RichText::new(text)
+                    }
+                };
+                center_label(ui, bold_if_main("Rank"));
+                ui.label(bold_if_main("Player"));
+                center_label(ui, bold_if_main("Score"));
+
                 ui.allocate_space(egui::vec2(ui.available_width(), 0.0));
                 ui.end_row();
 
@@ -180,6 +217,33 @@ impl RankDisplayApp {
                     } else {
                         self.player_ranks.get(&player.platform_id)
                     };
+
+                    // rank in this gamemode
+                    if let Some(skill) = &skill {
+                        let rank = match playlist {
+                            Playlist::Ones => skill.duels.as_ref(),
+                            Playlist::Twos => skill.doubles.as_ref(),
+                            Playlist::Threes => skill.standard.as_ref(),
+                            _ => None,
+                        };
+
+                        match rank {
+                            Some(rank) => {
+                                center_layout(ui, 28.0, |ui| {
+                                    ui.add(
+                                        egui::Image::new(rank.rank.to_image())
+                                            .fit_to_exact_size(egui::vec2(28.0, 28.0)),
+                                    )
+                                    .on_hover_text("Rank in this gamemode")
+                                });
+                            }
+                            None => {
+                                center_label(ui, "-");
+                            }
+                        };
+                    } else {
+                        center_label(ui, "-");
+                    }
 
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 4.0;
@@ -193,11 +257,13 @@ impl RankDisplayApp {
                                 .size(15.0),
                         );
 
+                        // rank list
                         ui.horizontal(|ui| {
-                            if let Some(skill) = skill.clone() {
+                            if let Some(skill) = &skill {
                                 let modes = [&skill.duels, &skill.doubles, &skill.standard];
 
                                 for mode in modes {
+                                    // per-rank mmr + icon
                                     ui.horizontal(|ui| {
                                         ui.spacing_mut().item_spacing.x = 2.0;
 
@@ -224,7 +290,8 @@ impl RankDisplayApp {
                             }
                         });
                     });
-                    ui.label(player.score.to_string());
+
+                    center_label(ui, player.score.to_string());
                     ui.allocate_space(egui::vec2(ui.available_width(), 0.0));
                     ui.end_row();
                 }
