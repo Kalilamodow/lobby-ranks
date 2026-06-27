@@ -1,7 +1,8 @@
 use crate::app::hotkey;
 use crate::app::player_list::PlayerTable;
-use crate::rl::{Platform, PlayerData, RLEvent, RankAPI, Team, connect_to_stats_api};
-use eframe::egui;
+use crate::rl::{Platform, PlayerData, RLEvent, RankAPI, Team, TeamScores, connect_to_stats_api};
+use eframe::egui::{self, Color32};
+use std::cmp::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -42,7 +43,7 @@ fn sort_player_list(players: &mut [MatchPlayer]) {
 struct MatchInfo {
     pub players: Vec<MatchPlayer>,
     pub timestamp: SystemTime,
-    pub winner: Option<Team>,
+    pub score: TeamScores,
 }
 
 pub struct RlBuddyApp {
@@ -50,8 +51,9 @@ pub struct RlBuddyApp {
     current_error: Option<String>,
 
     rl_rx: mpsc::Receiver<RLEvent>,
-    current_players: Option<Vec<MatchPlayer>>,
     player_ranks: RankAPI,
+    current_players: Option<Vec<MatchPlayer>>,
+    current_score: Option<TeamScores>,
 
     prev_hide_pos: Option<egui::Pos2>,
     prev_match_info: Vec<MatchInfo>,
@@ -69,6 +71,7 @@ impl RlBuddyApp {
 
         let app = RlBuddyApp {
             current_players: None,
+            current_score: None,
             rl_rx,
             error_receiver: errors_rx,
             player_ranks: RankAPI::new(cc.egui_ctx.clone(), errors_tx.clone()),
@@ -125,11 +128,26 @@ impl RlBuddyApp {
                 ui.add(egui::Separator::default().spacing(8.0));
 
                 ui.horizontal(|ui| {
-                    if let Some(winner) = prev_match.winner {
-                        ui.label(bold_text(format!("{}", winner)));
-                    } else {
-                        ui.label(bold_text("Unknown winner"));
-                    }
+                    let winner_label = match prev_match.score.blue.cmp(&prev_match.score.orange) {
+                        Ordering::Greater => "Blue won",
+                        Ordering::Less => "Orange won",
+                        Ordering::Equal => "Tie",
+                    };
+
+                    ui.label(bold_text(winner_label));
+
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 0.0;
+                        ui.label(
+                            egui::RichText::new(prev_match.score.blue.to_string())
+                                .color(Color32::LIGHT_BLUE),
+                        );
+                        ui.label("-");
+                        ui.label(
+                            egui::RichText::new(prev_match.score.orange.to_string())
+                                .color(Color32::LIGHT_RED),
+                        );
+                    });
 
                     ui.label(format!(
                         "{} seconds ago",
@@ -253,10 +271,13 @@ impl eframe::App for RlBuddyApp {
 
                     sort_player_list(players);
                 }
+                RLEvent::SetScore(score) => {
+                    self.current_score = Some(score);
+                }
                 RLEvent::MatchStart => {
                     self.popup();
                 }
-                RLEvent::MatchEnd(winner) => {
+                RLEvent::MatchEnd(_winner) => {
                     if let Some(players) = &self.current_players {
                         if players.len() <= 1 {
                             return;
@@ -266,12 +287,12 @@ impl eframe::App for RlBuddyApp {
                             0,
                             MatchInfo {
                                 players: players.clone(),
-                                winner,
                                 timestamp: SystemTime::now(),
+                                score: self.current_score.take().unwrap_or_default(),
                             },
                         );
 
-                        self.current_players = Some(Vec::new());
+                        self.current_players = None;
                     }
                 }
             }

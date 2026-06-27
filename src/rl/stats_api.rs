@@ -27,8 +27,30 @@ struct StatsApiPlayerData {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+struct StatsApiTeamData {
+    score: u8,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct StatsApiGameData {
+    teams: [StatsApiTeamData; 2],
+}
+
+impl StatsApiGameData {
+    fn scores(&self) -> TeamScores {
+        TeamScores {
+            blue: self.teams[0].score,
+            orange: self.teams[1].score,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 struct UpdateStateEventData {
     players: Vec<StatsApiPlayerData>,
+    game: StatsApiGameData,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +58,12 @@ struct UpdateStateEventData {
 struct MatchEndedEventData {
     winner_team_num: u8,
     // match_guid: String,
+}
+
+#[derive(Debug, Default)]
+pub struct TeamScores {
+    pub blue: u8,
+    pub orange: u8,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -170,6 +198,7 @@ impl fmt::Display for StatsApiError {
 
 pub enum RLEvent {
     SetPlayerList(Vec<PlayerData>),
+    SetScore(TeamScores),
     MatchStart,
     MatchEnd(Option<Team>),
 }
@@ -222,6 +251,8 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
             "UpdateState" => {
                 let data: UpdateStateEventData = serde_json::from_str(&event.data)
                     .map_err(|e| StatsApiError::InvalidStatsApiMessage(e.to_string() + text))?;
+
+                on_event(RLEvent::SetScore(data.game.scores()));
                 on_event(RLEvent::SetPlayerList(
                     data.players
                         .into_iter()
