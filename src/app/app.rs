@@ -42,7 +42,7 @@ fn sort_player_list(players: &mut [MatchPlayer]) {
 struct MatchInfo {
     pub players: Vec<MatchPlayer>,
     pub timestamp: SystemTime,
-    pub winner: Team,
+    pub winner: Option<Team>,
 }
 
 pub struct RlBuddyApp {
@@ -125,7 +125,12 @@ impl RlBuddyApp {
                 ui.add(egui::Separator::default().spacing(8.0));
 
                 ui.horizontal(|ui| {
-                    ui.label(bold_text(format!("{}", prev_match.winner)));
+                    if let Some(winner) = prev_match.winner {
+                        ui.label(bold_text(format!("{}", winner)));
+                    } else {
+                        ui.label(bold_text("Unknown winner"));
+                    }
+
                     ui.label(format!(
                         "{} seconds ago",
                         current_time
@@ -251,14 +256,14 @@ impl eframe::App for RlBuddyApp {
                 RLEvent::MatchStart => {
                     self.popup();
                 }
-                RLEvent::MatchEnd(team) => {
+                RLEvent::MatchEnd(winner) => {
                     if let Some(players) = &self.current_players {
                         self.prev_match_info.insert(
                             0,
                             MatchInfo {
                                 players: players.clone(),
+                                winner,
                                 timestamp: SystemTime::now(),
-                                winner: team,
                             },
                         );
 

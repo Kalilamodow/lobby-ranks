@@ -171,7 +171,7 @@ impl fmt::Display for StatsApiError {
 pub enum RLEvent {
     SetPlayerList(Vec<PlayerData>),
     MatchStart,
-    MatchEnd(Team),
+    MatchEnd(Option<Team>),
 }
 
 // cant use connect_timeout bc it just errors instead of waiting when the
@@ -193,6 +193,12 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
     // MatchInitialized doesnt fire in private matches for some reason
     // so listen for match created then the first countdown is the "game start"
     let mut match_created_event_happened = false;
+
+    // matchended is called when a winner is announced, matchdestroyed is
+    // leaving the game. if matchended is already called, we dont want to emit
+    // another MatchEnd event
+    // (matchdestroyed can be called first eg if player abandons)
+    let mut match_ended_event_happened = false;
 
     loop {
         let n_bytes = match tcp.read(&mut read_buffer) {
@@ -231,10 +237,14 @@ pub fn connect_to_stats_api<F: Fn(RLEvent)>(on_event: F) -> Result<(), StatsApiE
                 match_created_event_happened = false;
                 on_event(RLEvent::MatchStart);
             }
+            "MatchDestroyed" if !match_ended_event_happened => {
+                on_event(RLEvent::MatchEnd(None));
+            }
             "MatchEnded" => {
                 let data: MatchEndedEventData = serde_json::from_str(&event.data)
                     .map_err(|e| StatsApiError::InvalidStatsApiMessage(e.to_string() + text))?;
-                on_event(RLEvent::MatchEnd(Team::from(data.winner_team_num)));
+                on_event(RLEvent::MatchEnd(Some(Team::from(data.winner_team_num))));
+                match_ended_event_happened = true;
             }
             _ => {}
         }
