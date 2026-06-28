@@ -26,7 +26,12 @@ impl<'a> PlayerTable<'a> {
         }
     }
 
-    fn render_player(&self, ui: &mut egui::Ui, playlist: &Playlist, match_player: &MatchPlayer) {
+    fn render_player(
+        &self,
+        ui: &mut egui::Ui,
+        playlist: &Option<Playlist>,
+        match_player: &MatchPlayer,
+    ) {
         let skill = if match_player.data.platform == Platform::Bot {
             None
         } else {
@@ -34,7 +39,9 @@ impl<'a> PlayerTable<'a> {
         };
 
         // rank in this gamemode
-        if let Some(skill) = &skill {
+        if let Some(skill) = &skill
+            && let Some(playlist) = playlist
+        {
             PlayerTable::render_player_rank_cell(ui, playlist, skill);
         } else {
             center_label(ui, "-");
@@ -163,19 +170,15 @@ impl egui::Widget for PlayerTable<'_> {
                 ui.allocate_space(egui::vec2(ui.available_width(), 0.0));
                 ui.end_row();
 
-                if let Some(playlist) = playlist {
-                    if self.show_all {
-                        for player in self.players {
-                            self.render_player(ui, &playlist, player);
-                        }
-                    } else {
-                        for player in filter_useless_bots(self.players) {
-                            self.render_player(ui, &playlist, player);
-                        }
-                    };
+                if self.show_all {
+                    for player in self.players {
+                        self.render_player(ui, &playlist, player);
+                    }
                 } else {
-                    ui.spinner();
-                }
+                    for player in filter_useless_bots(self.players) {
+                        self.render_player(ui, &playlist, player);
+                    }
+                };
             })
             .response
     }
