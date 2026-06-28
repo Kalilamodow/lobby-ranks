@@ -8,11 +8,22 @@ pub struct PlayerTable<'a> {
     players: &'a Vec<MatchPlayer>,
     id: &'a str,
     ranks: &'a RankAPI,
+    show_all: bool,
 }
 
 impl<'a> PlayerTable<'a> {
-    pub fn new(players: &'a Vec<MatchPlayer>, id: &'a str, ranks: &'a RankAPI) -> PlayerTable<'a> {
-        PlayerTable { players, id, ranks }
+    pub fn new(
+        players: &'a Vec<MatchPlayer>,
+        id: &'a str,
+        ranks: &'a RankAPI,
+        show_all: bool,
+    ) -> PlayerTable<'a> {
+        PlayerTable {
+            players,
+            id,
+            ranks,
+            show_all,
+        }
     }
 
     fn render_player(&self, ui: &mut egui::Ui, playlist: &Playlist, match_player: &MatchPlayer) {
@@ -153,9 +164,15 @@ impl egui::Widget for PlayerTable<'_> {
                 ui.end_row();
 
                 if let Some(playlist) = playlist {
-                    for player in self.players {
-                        self.render_player(ui, &playlist, player);
-                    }
+                    if self.show_all {
+                        for player in self.players {
+                            self.render_player(ui, &playlist, player);
+                        }
+                    } else {
+                        for player in filter_useless_bots(self.players) {
+                            self.render_player(ui, &playlist, player);
+                        }
+                    };
                 } else {
                     ui.spinner();
                 }
@@ -185,4 +202,10 @@ fn center_label(
 
 fn bold_text(text: impl Into<String>) -> egui::RichText {
     egui::RichText::new(text).strong()
+}
+
+fn filter_useless_bots(players: &[MatchPlayer]) -> impl Iterator<Item = &MatchPlayer> {
+    players
+        .iter()
+        .filter(|p| p.data.platform != Platform::Bot || p.data.score != 0)
 }

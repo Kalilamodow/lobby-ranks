@@ -237,6 +237,7 @@ impl egui::Widget for &Matches {
                             current_players,
                             "current match",
                             &self.player_ranks,
+                            true,
                         ));
                     }
                 }
@@ -280,6 +281,7 @@ impl egui::Widget for &Matches {
                             .to_string()
                             .as_str(),
                         &self.player_ranks,
+                        false,
                     ));
                 }
             });
