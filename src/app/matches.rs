@@ -40,6 +40,31 @@ fn score_labels(ui: &mut egui::Ui, scores: &TeamScores, priority: Team) {
     });
 }
 
+fn pluralize_ago(count: u64, word: &str, suffix: &str) -> String {
+    format!(
+        "{count} {word}{} {suffix}",
+        if count == 1 { "" } else { "s" }
+    )
+}
+
+const ONE_SECOND: Duration = Duration::from_secs(1);
+const ONE_MINUTE: Duration = Duration::from_mins(1);
+
+pub fn format_seconds(seconds: u64) -> (String, Duration) {
+    match seconds {
+        ..60 => (pluralize_ago(seconds, "second", "ago"), ONE_SECOND),
+        60..3600 => (pluralize_ago(seconds / 60, "minute", "ago"), ONE_MINUTE),
+        3600.. => (
+            format!(
+                "{}{}",
+                pluralize_ago(seconds / 3600, "hour", ""),
+                pluralize_ago((seconds % 3600) / 60, "minute", "ago")
+            ),
+            ONE_MINUTE,
+        ),
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MatchPlayer {
     pub left: bool,
@@ -239,13 +264,14 @@ impl egui::Widget for &Matches {
 
                         score_labels(ui, &prev_match.score, prev_match.our_team);
 
-                        ui.label(format!(
-                            "{} seconds ago",
-                            current_time
-                                .duration_since(prev_match.timestamp)
-                                .unwrap_or_default()
-                                .as_secs()
-                        ));
+                        let seconds_ago = current_time
+                            .duration_since(prev_match.timestamp)
+                            .unwrap_or_default()
+                            .as_secs();
+
+                        let (formatted_time, update_after) = format_seconds(seconds_ago);
+                        ui.label(formatted_time);
+                        ui.ctx().request_repaint_after(update_after);
                     });
 
                     ui.add(PlayerTable::new(
