@@ -82,24 +82,31 @@ impl<'a> MatchRenderer<'a> {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 4.0;
 
-            let name_color = if match_player.left {
-                Color32::GRAY
-            } else if match_player.data.is_self {
-                ui.visuals().strong_text_color()
-            } else {
-                match match_player.data.team {
-                    Team::Blue => Color32::from_rgb(64, 128, 255),
-                    Team::Orange => Color32::ORANGE,
-                }
-            };
-            ui.add(
-                egui::Label::new(
-                    bold_text(&match_player.data.name)
-                        .color(name_color)
-                        .size(15.0),
-                )
-                .extend(),
-            );
+            ui.horizontal(|ui| {
+                let name_color = if match_player.left {
+                    Color32::GRAY
+                } else if match_player.data.is_self {
+                    ui.visuals().strong_text_color()
+                } else {
+                    match match_player.data.team {
+                        Team::Blue => Color32::from_rgb(64, 128, 255),
+                        Team::Orange => Color32::ORANGE,
+                    }
+                };
+                ui.add(
+                    egui::Label::new(
+                        bold_text(&match_player.data.name)
+                            .color(name_color)
+                            .size(15.0),
+                    )
+                    .extend(),
+                );
+
+                ui.label(
+                    egui::RichText::new(match_player.data.platform.to_string())
+                        .color(ui.visuals().weak_text_color()),
+                );
+            });
 
             if let Some(skill) = &skill {
                 MatchRenderer::render_rank_list(ui, match_player.left, skill);
