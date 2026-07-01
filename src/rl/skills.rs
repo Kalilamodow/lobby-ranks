@@ -81,18 +81,6 @@ impl EventRanks {
     }
 }
 
-fn get_with_retries<const RETRIES: u8>(
-    url: &String,
-) -> Result<ureq::http::Response<ureq::Body>, ()> {
-    for _ in 0..RETRIES {
-        if let Ok(resp) = ureq::get(url).call() {
-            return Ok(resp);
-        }
-    }
-
-    Err(())
-}
-
 pub struct RankAPI {
     // option for whether its loaded yet
     ranks: Arc<RwLock<HashMap<String, Option<Arc<EventRanks>>>>>,
@@ -130,7 +118,7 @@ impl RankAPI {
                 current.insert(platform_id.clone(), None);
             }
 
-            let Ok(mut response) = get_with_retries::<3>(&url) else {
+            let Ok(mut response) = super::utils::get_with_retries::<3>(&url) else {
                 error_tx
                     .send("Could not communicate with rank server".to_string())
                     .unwrap();

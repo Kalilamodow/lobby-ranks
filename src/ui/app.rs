@@ -27,7 +27,7 @@ impl RlBuddyApp {
             current_error: None,
             overlay_rx,
             prev_hide_pos: None,
-            matches: Matches::new(ctx.clone(), overlay_tx.clone(), errors_tx),
+            matches: Matches::new(&ctx, overlay_tx.clone(), errors_tx),
         };
 
         let overlay_tx_for_hotkey = overlay_tx.clone();

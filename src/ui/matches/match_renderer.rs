@@ -95,7 +95,7 @@ impl<'a> MatchRenderer<'a> {
                 };
                 ui.add(
                     egui::Label::new(
-                        bold_text(&match_player.data.name)
+                        bold_text(match_player.display_name())
                             .color(name_color)
                             .size(15.0),
                     )
@@ -115,10 +115,10 @@ impl<'a> MatchRenderer<'a> {
 
         center_label(ui, match_player.data.score.to_string());
 
-        if let Some(trn_link) = match_player.trn_link() {
-            if ui.button("TRN").clicked() {
-                let _ = webbrowser::open(&trn_link);
-            }
+        if let Some(trn_link) = match_player.trn_link()
+            && ui.button("TRN").clicked()
+        {
+            let _ = webbrowser::open(&trn_link);
         }
 
         ui.end_row();
@@ -291,7 +291,7 @@ fn center_label(
     center_layout(ui, 16.0, |ui| ui.label(text))
 }
 
-fn bold_text(text: impl Into<String>) -> egui::RichText {
+fn bold_text(text: &str) -> egui::RichText {
     egui::RichText::new(text).strong()
 }
 

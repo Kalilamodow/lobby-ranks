@@ -1,24 +1,34 @@
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
 
-use crate::rl::{Platform, PlayerData, Team, TeamScores};
+use crate::rl::{NameAPI, Platform, PlayerData, Team, TeamScores};
 
 #[derive(Debug, Clone)]
 pub struct MatchPlayer {
     pub left: bool,
+    pub uncensored_name: Option<Arc<String>>,
     pub data: PlayerData,
 }
 
 impl MatchPlayer {
+    pub fn uncensor_with(&mut self, api: &NameAPI) {
+        self.uncensored_name = api.get(&self.data.platform_id);
+    }
+
+    pub fn display_name(&self) -> &str {
+        // unwrap or else gives a error idk why
+        match &self.uncensored_name {
+            Some(name) => name,
+            None => self.data.name.as_str(),
+        }
+    }
+
     pub fn trn_link(&self) -> Option<String> {
         let (prefix, id) = match self.data.platform {
             Platform::Switch | Platform::Bot => return None,
-            Platform::Epic => ("epic", &self.data.name),
-            Platform::PlayStation => ("psn", &self.data.name),
-            Platform::Xbox => ("xbl", &self.data.name),
-            Platform::Steam => (
-                "steam",
-                &self.data.platform_id.split('|').nth(1).unwrap().to_string(),
-            ),
+            Platform::Epic => ("epic", self.display_name()),
+            Platform::PlayStation => ("psn", self.display_name()),
+            Platform::Xbox => ("xbl", self.display_name()),
+            Platform::Steam => ("steam", self.data.platform_id.split('|').nth(1).unwrap()),
         };
 
         Some(format!(
@@ -31,6 +41,7 @@ impl From<PlayerData> for MatchPlayer {
     fn from(value: PlayerData) -> Self {
         MatchPlayer {
             left: false,
+            uncensored_name: None,
             data: value,
         }
     }

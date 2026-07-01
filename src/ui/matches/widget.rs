@@ -12,7 +12,11 @@ use super::{
     core::{MatchInfo, MatchOverInfo, MatchPlayer},
     match_renderer::MatchRenderer,
 };
-use crate::rl::{Platform, PlayerData, RLEvent, RankAPI, Team, connect_to_stats_api};
+use crate::rl::{NameAPI, Platform, PlayerData, RLEvent, RankAPI, Team, connect_to_stats_api};
+
+fn is_censored(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c == '*')
+}
 
 fn diff_player_list(current: &mut Vec<MatchPlayer>, mut new_players: Vec<PlayerData>) {
     // bots all share the same id so replace it for comparisons
@@ -43,6 +47,7 @@ fn diff_player_list(current: &mut Vec<MatchPlayer>, mut new_players: Vec<PlayerD
 pub struct Matches {
     rl_rx: mpsc::Receiver<RLEvent>,
     player_ranks: RankAPI,
+    player_names: NameAPI,
     current_match: Option<MatchInfo>,
     prev_match_info: Vec<MatchInfo>,
     overlay_tx: mpsc::Sender<bool>,
@@ -50,7 +55,7 @@ pub struct Matches {
 
 impl Matches {
     pub fn new(
-        ctx: egui::Context,
+        ctx: &egui::Context,
         overlay_tx: mpsc::Sender<bool>,
         errors_tx: mpsc::Sender<String>,
     ) -> Matches {
@@ -71,7 +76,8 @@ impl Matches {
 
         Matches {
             rl_rx,
-            player_ranks: RankAPI::new(ctx, errors_tx),
+            player_ranks: RankAPI::new(ctx.clone(), errors_tx),
+            player_names: NameAPI::new(ctx.clone()),
             current_match: None,
             prev_match_info: Vec::new(),
             overlay_tx,
@@ -130,6 +136,12 @@ impl Matches {
 
                     current_match.score = state.score;
                     diff_player_list(&mut current_match.players, state.players);
+
+                    for player in &mut current_match.players {
+                        if is_censored(&player.data.name) {
+                            player.uncensor_with(&self.player_names);
+                        }
+                    }
 
                     current_match.our_team = current_match
                         .players
