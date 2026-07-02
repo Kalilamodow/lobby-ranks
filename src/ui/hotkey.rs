@@ -6,6 +6,8 @@ use std::{
 use eframe::egui;
 use rdev::{Event, EventType, Key};
 
+use crate::ui::settings::SettingsState;
+
 #[derive(Default)]
 struct HotkeyState {
     keys_pressed: HashSet<Key>,
@@ -17,7 +19,12 @@ fn callback(
     event: &Event,
     trigger: &mpsc::Sender<bool>,
     ctx: &egui::Context,
+    settings: &Arc<RwLock<SettingsState>>,
 ) {
+    let Some(hotkey) = settings.read().unwrap().hotkey.to_rdev() else {
+        return;
+    };
+
     let mut state = state.write().unwrap();
     match event.event_type {
         EventType::KeyPress(key) => {
@@ -29,7 +36,7 @@ fn callback(
         _ => {}
     }
 
-    if state.keys_pressed.contains(&Key::Alt) {
+    if state.keys_pressed.contains(&hotkey) {
         if !state.previous {
             state.previous = true;
             trigger.send(true).unwrap();
@@ -42,9 +49,13 @@ fn callback(
     }
 }
 
-pub fn listen_for_hotkey(trigger: mpsc::Sender<bool>, ctx: egui::Context) {
+pub fn listen_for_hotkey(
+    trigger: mpsc::Sender<bool>,
+    ctx: egui::Context,
+    settings: Arc<RwLock<SettingsState>>,
+) {
     let state = Arc::new(RwLock::new(HotkeyState::default()));
-    if let Err(error) = rdev::listen(move |e| callback(&state, &e, &trigger, &ctx)) {
+    if let Err(error) = rdev::listen(move |e| callback(&state, &e, &trigger, &ctx, &settings)) {
         println!("Hotkey hook error: {error:?}");
     }
 }

@@ -1,3 +1,5 @@
+use crate::ui::settings::SettingsWidget;
+
 use super::{hotkey, matches::Matches};
 use eframe::egui;
 use std::collections::HashSet;
@@ -11,9 +13,23 @@ fn bold_text(text: impl Into<String>) -> egui::RichText {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Panel {
     Matches,
+    Settings,
 }
 
-const ALL_PANELS: [Panel; 1] = [Panel::Matches];
+impl std::fmt::Display for Panel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Panel::Matches => "Matches",
+                Panel::Settings => "Settings",
+            }
+        )
+    }
+}
+
+const ALL_PANELS: [Panel; 2] = [Panel::Matches, Panel::Settings];
 
 pub struct RlBuddyApp {
     error_receiver: mpsc::Receiver<String>,
@@ -23,6 +39,7 @@ pub struct RlBuddyApp {
 
     open_panels: HashSet<Panel>,
     matches: Matches,
+    settings: SettingsWidget,
 }
 
 impl RlBuddyApp {
@@ -31,7 +48,17 @@ impl RlBuddyApp {
         let (errors_tx, errors_rx) = mpsc::channel();
         let (overlay_tx, overlay_rx) = mpsc::channel();
 
-        let app = RlBuddyApp {
+        let settings = SettingsWidget::new();
+
+        let overlay_tx_for_hotkey = overlay_tx.clone();
+        let ctx_for_hotkey = ctx.clone();
+        let settings_for_hotkey = settings.clone_state();
+
+        thread::spawn(move || {
+            hotkey::listen_for_hotkey(overlay_tx_for_hotkey, ctx_for_hotkey, settings_for_hotkey);
+        });
+
+        RlBuddyApp {
             error_receiver: errors_rx,
             current_error: None,
             overlay_rx,
@@ -39,15 +66,8 @@ impl RlBuddyApp {
 
             open_panels: HashSet::from([Panel::Matches]),
             matches: Matches::new(&ctx, overlay_tx.clone(), errors_tx),
-        };
-
-        let overlay_tx_for_hotkey = overlay_tx.clone();
-        let ctx_for_hotkey = ctx.clone();
-        thread::spawn(move || {
-            hotkey::listen_for_hotkey(overlay_tx_for_hotkey, ctx_for_hotkey);
-        });
-
-        app
+            settings,
+        }
     }
 
     fn show(&mut self, ctx: &egui::Context) {
@@ -86,9 +106,9 @@ impl RlBuddyApp {
         }
     }
 
-    fn panel_remove_button(&mut self, ui: &mut egui::Ui, text: &str, panel: &Panel) {
+    fn panel_remove_button(&mut self, ui: &mut egui::Ui, text: &str, panel: Panel) {
         if ui.button(text).clicked() {
-            self.open_panels.remove(panel);
+            self.open_panels.remove(&panel);
         }
     }
 }
@@ -102,11 +122,7 @@ impl eframe::App for RlBuddyApp {
         egui::Panel::bottom("bottom_buttons").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 for panel in ALL_PANELS {
-                    match panel {
-                        Panel::Matches => {
-                            self.panel_add_button(ui, "Matches", panel);
-                        }
-                    }
+                    self.panel_add_button(ui, &panel.to_string(), panel);
                 }
             });
         });
@@ -120,6 +136,11 @@ impl eframe::App for RlBuddyApp {
                 }
             } else {
                 ui.vertical_centered_justified(|ui| {
+                    if self.open_panels.is_empty() {
+                        ui.label("No panels open");
+                        return;
+                    }
+
                     let mut is_first = true;
 
                     for panel in ALL_PANELS {
@@ -129,12 +150,11 @@ impl eframe::App for RlBuddyApp {
                             }
                             is_first = false;
 
+                            self.panel_remove_button(ui, &panel.to_string(), panel);
                             match panel {
-                                Panel::Matches => {
-                                    self.panel_remove_button(ui, "Matches", &panel);
-                                    ui.add(&self.matches);
-                                }
-                            }
+                                Panel::Matches => ui.add(&self.matches),
+                                Panel::Settings => ui.add(&self.settings),
+                            };
                         }
                     }
                 });
