@@ -1,5 +1,6 @@
 use super::{hotkey, matches::Matches};
 use eframe::egui;
+use std::collections::HashSet;
 use std::sync::mpsc;
 use std::thread;
 
@@ -7,12 +8,20 @@ fn bold_text(text: impl Into<String>) -> egui::RichText {
     egui::RichText::new(text).strong()
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+enum Panel {
+    Matches,
+}
+
+const ALL_PANELS: [Panel; 1] = [Panel::Matches];
+
 pub struct RlBuddyApp {
     error_receiver: mpsc::Receiver<String>,
     current_error: Option<String>,
     prev_hide_pos: Option<egui::Pos2>,
     overlay_rx: mpsc::Receiver<bool>,
 
+    open_panels: HashSet<Panel>,
     matches: Matches,
 }
 
@@ -27,6 +36,8 @@ impl RlBuddyApp {
             current_error: None,
             overlay_rx,
             prev_hide_pos: None,
+
+            open_panels: HashSet::from([Panel::Matches]),
             matches: Matches::new(&ctx, overlay_tx.clone(), errors_tx),
         };
 
@@ -65,6 +76,21 @@ impl RlBuddyApp {
             egui::WindowLevel::Normal,
         ));
     }
+
+    fn panel_add_button(&mut self, ui: &mut egui::Ui, text: &str, panel: Panel) {
+        if ui
+            .add_enabled(!self.open_panels.contains(&panel), egui::Button::new(text))
+            .clicked()
+        {
+            self.open_panels.insert(panel);
+        }
+    }
+
+    fn panel_remove_button(&mut self, ui: &mut egui::Ui, text: &str, panel: &Panel) {
+        if ui.button(text).clicked() {
+            self.open_panels.remove(panel);
+        }
+    }
 }
 
 impl eframe::App for RlBuddyApp {
@@ -72,6 +98,18 @@ impl eframe::App for RlBuddyApp {
         if let Ok(new_error) = self.error_receiver.try_recv() {
             self.current_error = Some(new_error);
         }
+
+        egui::Panel::bottom("bottom_buttons").show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                for panel in ALL_PANELS {
+                    match panel {
+                        Panel::Matches => {
+                            self.panel_add_button(ui, "Matches", panel);
+                        }
+                    }
+                }
+            });
+        });
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
             if let Some(err) = &self.current_error {
@@ -81,7 +119,25 @@ impl eframe::App for RlBuddyApp {
                     ui.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             } else {
-                ui.add(&self.matches);
+                ui.vertical_centered_justified(|ui| {
+                    let mut is_first = true;
+
+                    for panel in ALL_PANELS {
+                        if self.open_panels.contains(&panel) {
+                            if !is_first {
+                                ui.separator();
+                            }
+                            is_first = false;
+
+                            match panel {
+                                Panel::Matches => {
+                                    self.panel_remove_button(ui, "Matches", &panel);
+                                    ui.add(&self.matches);
+                                }
+                            }
+                        }
+                    }
+                });
             }
         });
     }
